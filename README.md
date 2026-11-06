@@ -86,7 +86,7 @@ and fetches each section only when you open it.
 ```bash
 export ANDROID_HOME=$HOME/Android/Sdk     # needs build-tools 34 + platform android-34
 export JAVA_HOME=/path/to/jdk             # JDK 11 or newer
-./android/build.sh                        # -> android/ChemSearch-1.0.0.apk
+bash android/build.sh                     # -> android/ChemSearch-1.0.0.apk
 ```
 
 The script creates its own signing keystore (`android/chemsearch.jks`) on first run. Replace it with
