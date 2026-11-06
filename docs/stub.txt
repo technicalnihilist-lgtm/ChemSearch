@@ -1,4 +1,0 @@
-ChemSearch
-==========
-
-Liquid-glass chemistry explorer powered by the PubChem API.

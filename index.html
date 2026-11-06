@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#05060a">
+<title>ChemSearch — PubChem Explorer</title>
+<meta name="description" content="ChemSearch is a liquid-glass chemistry explorer powered by the PubChem PUG REST API.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2300e5c0'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' fill='%23020608' font-family='sans-serif' font-weight='700'%3EC%3C/text%3E%3C/svg%3E">
+<style>
+/* ============ tokens ============ */
+:root{
+  --r-xl: 30px; --r-lg: 24px; --r-md: 18px; --r-sm: 12px;
+  --ease: cubic-bezier(.32,.72,0,1);
+  --glass-bg: linear-gradient(158deg, rgba(255,255,255,.16), rgba(255,255,255,.05) 45%, rgba(255,255,255,.09));
+  --glass-brd: rgba(255,255,255,.20);
+  --glass-hi: rgba(255,255,255,.55);
+  --glass-shadow: 0 24px 60px -28px rgba(0,0,0,.85), 0 2px 10px -4px rgba(0,0,0,.5);
+  --text: #f3f6fb;
+  --muted: #a2abbb;
+  --faint: #6f7889;
+  --tint: #4ee0c0;
+  --tint-2: #7c8cff;
+  --danger: #ff6b81;
+  --warn: #ffc857;
+  --ok: #4ee0a0;
+  --page: #05060a;
+  --blob-1: #12e0b8; --blob-2: #6a5cff; --blob-3: #ff5c8a; --blob-4: #ffb020;
+  --blob-op: .55;
+  --hair: rgba(255,255,255,.10);
+  --sheet: rgba(14,16,22,.72);
+}
+html[data-theme="light"]{
+  --glass-bg: linear-gradient(158deg, rgba(255,255,255,.78), rgba(255,255,255,.46) 50%, rgba(255,255,255,.62));
+  --glass-brd: rgba(255,255,255,.85);
+  --glass-hi: #fff;
+  --glass-shadow: 0 24px 50px -30px rgba(24,32,64,.45), 0 2px 8px -4px rgba(24,32,64,.18);
+  --text: #0b1220;
+  --muted: #55607a;
+  --faint: #8b95a9;
+  --tint: #0aa88b;
+  --tint-2: #5b62e8;
+  --page: #e9eef7;
+  --blob-1: #38e8c6; --blob-2: #8f8bff; --blob-3: #ff8fb0; --blob-4: #ffcf6b;
+  --blob-op: .85;
+  --hair: rgba(10,20,40,.10);
+  --sheet: rgba(255,255,255,.82);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0; background:var(--page); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.45; overflow:hidden;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  transition:background .5s var(--ease), color .4s var(--ease);
+}
+/* ============ animated backdrop ============ */
+#bg{position:fixed; inset:-20%; z-index:0; pointer-events:none; filter:blur(10px)}
+#bg .blob{position:absolute; border-radius:50%; opacity:var(--blob-op); mix-blend-mode:screen; will-change:transform}
+html[data-theme="light"] #bg .blob{mix-blend-mode:multiply; opacity:.5}
+#bg .b1{width:70vmax;height:70vmax;left:-22vmax;top:-18vmax;background:radial-gradient(circle at 30% 30%,var(--blob-1),transparent 62%);animation:drift1 26s var(--ease) infinite alternate}
+#bg .b2{width:64vmax;height:64vmax;right:-20vmax;top:-8vmax;background:radial-gradient(circle at 60% 40%,var(--blob-2),transparent 62%);animation:drift2 31s var(--ease) infinite alternate}
+#bg .b3{width:58vmax;height:58vmax;left:6vmax;bottom:-26vmax;background:radial-gradient(circle at 50% 60%,var(--blob-3),transparent 62%);animation:drift3 24s var(--ease) infinite alternate}
+#bg .b4{width:44vmax;height:44vmax;right:-10vmax;bottom:-16vmax;background:radial-gradient(circle at 50% 50%,var(--blob-4),transparent 60%);animation:drift4 36s var(--ease) infinite alternate}
+@keyframes drift1{to{transform:translate3d(8vmax,6vmax,0) scale(1.12)}}
+@keyframes drift2{to{transform:translate3d(-9vmax,9vmax,0) scale(1.06)}}
+@keyframes drift3{to{transform:translate3d(10vmax,-7vmax,0) scale(1.14)}}
+@keyframes drift4{to{transform:translate3d(-6vmax,-9vmax,0) scale(1.1)}}
+#grain{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.30; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E")}
+/* ============ glass primitives ============ */
+.glass{
+  position:relative; background:var(--glass-bg); border:1px solid var(--glass-brd);
+  -webkit-backdrop-filter:blur(26px) saturate(190%); backdrop-filter:blur(26px) saturate(190%);
+  box-shadow:var(--glass-shadow); border-radius:var(--r-lg); overflow:hidden;
+}
+.glass::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,0) 26%);
+  box-shadow:inset 0 1px 0 var(--glass-hi); opacity:.7;
+}
+.glass.flat::after{background:none; box-shadow:inset 0 1px 0 var(--glass-hi)}
+/* ============ shell ============ */
+#app{position:relative; z-index:2; height:100%; display:flex; flex-direction:column;
+  padding-top:env(safe-area-inset-top)}
+header#top{
+  position:sticky; top:0; z-index:40; padding:10px 14px 8px; display:flex; gap:10px; align-items:center;
+  background:linear-gradient(180deg, rgba(5,6,10,.55), rgba(5,6,10,0)); backdrop-filter:blur(4px);
+}
+html[data-theme="light"] header#top{background:linear-gradient(180deg, rgba(233,238,247,.7), rgba(233,238,247,0))}
+.brand{display:flex; align-items:center; gap:9px; flex:0 0 auto}
+.logo{width:36px;height:36px;border-radius:12px; display:grid; place-items:center; font-weight:800; font-size:15px; color:#03110e;
+  background:conic-gradient(from 140deg, #4ee0c0, #7c8cff, #ff5c8a, #4ee0c0);
+  box-shadow:0 6px 18px -8px rgba(78,224,192,.9), inset 0 1px 0 rgba(255,255,255,.6)}
+.brand b{font-size:16.5px; letter-spacing:-.3px; font-weight:700}
+.brand span{display:block; font-size:10px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; margin-top:-2px}
+.icon-btn{width:38px;height:38px;border-radius:14px; border:1px solid var(--glass-brd); background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(180%); color:var(--text); display:grid; place-items:center; font-size:16px;
+  box-shadow:0 8px 22px -14px rgba(0,0,0,.9), inset 0 1px 0 var(--glass-hi); cursor:pointer; transition:transform .2s var(--ease)}
+.icon-btn:active{transform:scale(.92)}
+main#view{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:2px 14px calc(96px + env(safe-area-inset-bottom)); scroll-behavior:smooth}
+main#view::-webkit-scrollbar{width:0}
+/* ============ search ============ */
+.searchwrap{position:relative; margin:2px 0 14px}
+.search{
+  display:flex; align-items:center; gap:10px; padding:0 8px 0 16px; height:56px; border-radius:22px;
+}
+.search input{
+  flex:1; min-width:0; background:none; border:0; outline:none; color:var(--text); font-size:16.5px; font-weight:500;
+  font-family:inherit; letter-spacing:-.2px; padding:0;
+}
+.search input::placeholder{color:var(--faint); font-weight:450}
+.search .go{width:40px;height:40px;border-radius:15px;border:0;cursor:pointer;font-size:16px;color:#04120f;
+  background:linear-gradient(150deg,#5ff0d2,#37c9a8); box-shadow:0 8px 20px -10px #37c9a8, inset 0 1px 0 rgba(255,255,255,.7);
+  display:grid;place-items:center;transition:transform .18s var(--ease)}
+.search .go:active{transform:scale(.9)}
+.suggest{margin-top:8px; border-radius:20px; padding:6px; max-height:44vh; overflow-y:auto; position:relative; z-index:5}
+.suggest button{
+  width:100%; text-align:left; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:14px;
+  background:none; border:0; color:var(--text); font-size:14.5px; font-family:inherit; cursor:pointer;
+}
+.suggest button:active{background:rgba(255,255,255,.12)}
+.suggest .dot{width:6px;height:6px;border-radius:50%;background:var(--tint); flex:0 0 auto}
+/* ============ typography blocks ============ */
+h2.sec{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:22px 4px 10px; font-weight:650}
+.hero{margin:6px 2px 18px}
+.hero h1{font-size:31px; line-height:1.1; letter-spacing:-1.1px; margin:0 0 8px; font-weight:750}
+.hero h1 em{font-style:normal; background:linear-gradient(100deg,#5ff0d2,#8b9bff 55%,#ff8fb0); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero p{margin:0; color:var(--muted); font-size:14px; max-width:34ch}
+/* ============ chips ============ */
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.chip{padding:8px 13px; border-radius:14px; font-size:13px; color:var(--text); cursor:pointer; border:1px solid var(--glass-brd);
+  background:var(--glass-bg); backdrop-filter:blur(18px); box-shadow:inset 0 1px 0 var(--glass-hi), 0 8px 18px -16px #000;
+  transition:transform .16s var(--ease); font-family:inherit}
+.chip:active{transform:scale(.94)}
+.chip.on{background:linear-gradient(150deg, rgba(95,240,210,.35), rgba(124,140,255,.28)); border-color:rgba(95,240,210,.6)}
+/* ============ cards / lists ============ */
+.card{padding:16px; margin-bottom:12px}
+.row{display:flex; align-items:center; gap:12px}
+.row .grow{flex:1; min-width:0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px}
+.truncate{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.muted{color:var(--muted)} .faint{color:var(--faint)}
+.tiny{font-size:11.5px} .small{font-size:13px}
+.result{display:flex; gap:12px; align-items:center; padding:12px; border-radius:var(--r-md); cursor:pointer; margin-bottom:10px}
+.result img{width:56px;height:56px;border-radius:14px; object-fit:contain; background:rgba(255,255,255,.9); flex:0 0 auto}
+.result .nm{font-weight:640; font-size:15px; letter-spacing:-.2px}
+.result .mt{font-size:12px; color:var(--muted); margin-top:2px}
+.empty{padding:30px 16px; text-align:center; color:var(--muted); font-size:14px}
+.spinner{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(255,255,255,.18); border-top-color:var(--tint); animation:spin .8s linear infinite; margin:26px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skel{height:14px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.16),rgba(255,255,255,.08));background-size:200% 100%;animation:sh 1.4s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+/* ============ bottom nav ============ */
+nav#tabs{
+  position:fixed; left:12px; right:12px; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:50;
+  display:flex; padding:7px; gap:4px; border-radius:26px;
+}
+nav#tabs button{
+  flex:1; border:0; background:none; color:var(--muted); font-family:inherit; font-size:10.5px; font-weight:600; letter-spacing:.02em;
+  padding:7px 2px 6px; border-radius:19px; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;
+  transition:color .25s var(--ease), background .25s var(--ease);
+}
+nav#tabs button i{font-style:normal; font-size:17px; line-height:1}
+nav#tabs button.on{color:var(--text); background:linear-gradient(160deg, rgba(255,255,255,.20), rgba(255,255,255,.06));
+  box-shadow:inset 0 1px 0 var(--glass-hi)}
+/* ============ compound header ============ */
+.chead{display:flex; align-items:center; gap:10px; padding:4px 0 10px}
+.chead .title{flex:1; min-width:0}
+.chead .title h2{margin:0; font-size:19px; letter-spacing:-.5px; font-weight:720; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.chead .title .sub{font-size:11.5px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase}
+.segs{display:flex; gap:7px; overflow-x:auto; padding:2px 0 12px; scrollbar-width:none; position:sticky; top:0; z-index:30}
+.segs::-webkit-scrollbar{display:none}
+.seg{flex:0 0 auto; padding:9px 14px; border-radius:16px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;
+  border:1px solid transparent; background:rgba(255,255,255,.06); backdrop-filter:blur(14px); font-family:inherit;
+  transition:all .25s var(--ease)}
+.seg.on{color:var(--text); background:linear-gradient(160deg, rgba(255,255,255,.22), rgba(255,255,255,.07));
+  border-color:var(--glass-brd); box-shadow:inset 0 1px 0 var(--glass-hi), 0 10px 24px -18px #000}
+/* ============ structure panel ============ */
+.structbox{position:relative; border-radius:var(--r-lg); overflow:hidden; display:grid; place-items:center; padding:14px;
+  background:radial-gradient(120% 100% at 50% 0%, rgba(255,255,255,.11), rgba(255,255,255,.025)); min-height:200px}
+.structbox img{max-width:100%; max-height:270px; object-fit:contain; filter:drop-shadow(0 8px 24px rgba(0,0,0,.35))}
+html[data-theme="dark"] .structbox img.inv{filter:invert(1) hue-rotate(180deg) drop-shadow(0 8px 24px rgba(0,0,0,.5))}
+/* ============ kv grid ============ */
+.kv{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.kv .cell{padding:12px 13px; border-radius:16px; background:rgba(255,255,255,.07); border:1px solid var(--hair)}
+html[data-theme="light"] .kv .cell{background:rgba(255,255,255,.6)}
+.kv .k{font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:3px}
+.kv .v{font-size:14.5px; font-weight:600; letter-spacing:-.2px; word-break:break-word}
+.kv .cell.wide{grid-column:span 2}
+/* ============ definition list ============ */
+dl.props{margin:0}
+dl.props div{display:flex; gap:12px; padding:10px 2px; border-bottom:1px solid var(--hair)}
+dl.props div:last-child{border-bottom:0}
+dl.props dt{flex:0 0 44%; color:var(--muted); font-size:13px; font-weight:500}
+dl.props dd{flex:1; margin:0; font-size:13.5px; word-break:break-word}
+/* ============ pug view render ============ */
+.pv{font-size:13.5px}
+.pv h4{margin:14px 0 6px; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:650}
+.pv .info{padding:9px 0; border-bottom:1px solid var(--hair)}
+.pv .info:last-child{border-bottom:0}
+.pv .iname{font-size:12px; color:var(--muted); margin-bottom:3px}
+.pv .ival{white-space:pre-wrap; word-break:break-word; font-size:13.5px}
+.pv img{max-width:100%; border-radius:10px; margin:6px 0; background:rgba(255,255,255,.9); padding:4px}
+.pv table{width:100%; border-collapse:collapse; font-size:12px; margin:6px 0; display:block; overflow-x:auto}
+.pv table td, .pv table th{border:1px solid var(--hair); padding:5px 7px; vertical-align:top; text-align:left}
+.pv table th{background:rgba(255,255,255,.08); font-weight:600}
+.pv a{color:var(--tint); text-decoration:none}
+.pv .ref{font-size:11px; color:var(--faint); margin-top:4px}
+/* ============ pills / tags ============ */
+.tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.tag{font-size:11.5px; padding:5px 10px; border-radius:11px; background:rgba(255,255,255,.10); border:1px solid var(--hair); color:var(--text)}
+.tag.mono{font-size:11px}
+.ghs{display:flex; gap:8px; flex-wrap:wrap}
+.ghs img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:12px;padding:4px;border:2px solid #e33}
+/* ============ buttons ============ */
+.btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.btn{display:inline-flex; align-items:center; gap:7px; padding:11px 15px; border-radius:15px; font-size:13.5px; font-weight:600;
+  border:1px solid var(--glass-brd); background:var(--glass-bg); color:var(--text); cursor:pointer; font-family:inherit;
+  box-shadow:inset 0 1px 0 var(--glass-hi), 0 10px 24px -18px #000; text-decoration:none; transition:transform .16s var(--ease)}
+.btn:active{transform:scale(.95)}
+.btn.primary{background:linear-gradient(150deg,#5ff0d2,#37c9a8); color:#04120f; border-color:rgba(255,255,255,.5)}
+.btn.danger{color:var(--danger)}
+/* ============ element grid ============ */
+.ptable{display:grid; grid-template-columns:repeat(18,1fr); gap:3.5px; font-size:9.5px; min-width:0}
+.el{aspect-ratio:1; border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; color:#06080d; font-weight:700; line-height:1.05; border:1px solid rgba(0,0,0,.25); overflow:hidden}
+.el span{font-size:7px; font-weight:600; opacity:.8}
+.el.blank{background:none!important; border:0; cursor:default}
+.elwrap{overflow-x:auto; padding-bottom:6px}
+.elcard{display:flex; gap:14px; align-items:center}
+.elbig{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;font-size:30px;font-weight:800;color:#06080d;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 14px 30px -18px #000}
+/* ============ sheet ============ */
+#sheet{position:fixed; inset:0; z-index:90; display:none; align-items:flex-end}
+#sheet.open{display:flex}
+#sheet .scrim{position:absolute; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(6px)}
+#sheet .panel{position:relative; width:100%; max-height:82vh; overflow-y:auto; border-radius:30px 30px 0 0; padding:8px 18px calc(26px + env(safe-area-inset-bottom));
+  background:var(--sheet); border:1px solid var(--glass-brd); border-bottom:0;
+  -webkit-backdrop-filter:blur(40px) saturate(200%); backdrop-filter:blur(40px) saturate(200%);
+  box-shadow:0 -30px 80px -30px rgba(0,0,0,.9); animation:up .38s var(--ease)}
+@keyframes up{from{transform:translateY(30px); opacity:.4}}
+#sheet .grab{width:38px;height:5px;border-radius:3px;background:var(--faint);opacity:.5;margin:6px auto 14px}
+/* ============ toast ============ */
+#toast{position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translate(-50%,14px); z-index:120;
+  padding:11px 18px; border-radius:16px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:.3s var(--ease);
+  background:rgba(20,22,30,.86); color:#fff; border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(20px)}
+#toast.show{opacity:1; transform:translate(-50%,0)}
+/* ============ misc ============ */
+.credit{font-size:11.5px; color:var(--muted); line-height:1.6}
+.credit a{color:var(--tint); text-decoration:none}
+.about h3{margin:18px 0 6px; font-size:14px}
+.about p{margin:0 0 8px; font-size:13.5px; color:var(--muted)}
+.badge{font-size:10px; letter-spacing:.1em; text-transform:uppercase; padding:4px 8px; border-radius:9px;
+  background:rgba(95,240,210,.16); color:var(--tint); border:1px solid rgba(95,240,210,.35); font-weight:700}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.stat{padding:14px; border-radius:18px; background:rgba(255,255,255,.07); border:1px solid var(--hair)}
+html[data-theme="light"] .stat{background:rgba(255,255,255,.6)}
+.stat .n{font-size:22px; font-weight:750; letter-spacing:-.8px}
+.stat .l{font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted)}
+hr.hair{border:0; border-top:1px solid var(--hair); margin:14px 0}
+a{color:var(--tint)}
+.hidden{display:none!important}
+@media (min-width:640px){ main#view{padding-left:max(14px, calc(50vw - 300px)); padding-right:max(14px, calc(50vw - 300px))} }
+</style>
+</head>
+<body>
+<div id="bg" aria-hidden="true">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
+</div>
+<div id="grain" aria-hidden="true"></div>
+
+<div id="app">
+  <header id="top">
+    <div class="brand">
+      <div class="logo">C</div>
+      <div><b>ChemSearch</b><span>PubChem Explorer</span></div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </header>
+
+  <main id="view" role="main"></main>
+
+  <nav id="tabs" class="glass flat" aria-label="Primary">
+    <button data-nav="home" class="on"><i>⌕</i>Search</button>
+    <button data-nav="elements"><i>⌗</i>Elements</button>
+    <button data-nav="saved"><i>★</i>Saved</button>
+    <button data-nav="about"><i>ⓘ</i>About</button>
+  </nav>
+</div>
+
+<div id="sheet" aria-hidden="true">
+  <div class="scrim" data-close="1"></div>
+  <div class="panel" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+/* =========================================================================
+   ChemSearch — a liquid-glass front end for the PubChem PUG REST + PUG View API
+   Data source: PubChem (https://pubchem.ncbi.nlm.nih.gov), NCBI / U.S. NLM / NIH.
+   PubChem data is public domain; this app is an independent client and is not
+   endorsed by NCBI. Please cite PubChem when you reuse its data.
+   ========================================================================= */
+'use strict';
+
+const PUG  = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug';
+const PVW  = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound';
+const AUTO = 'https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound';
+const WEB  = 'https://pubchem.ncbi.nlm.nih.gov/compound';
+
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+const view = () => $('#view');
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const fmt = n => (n == null || n === '') ? '—' : String(n);
+
+/* ---------- tiny cache ---------- */
+const CACHE = new Map();
+function getJSON(url, ttl) {
+  const hit = CACHE.get(url);
+  if (hit) return hit;
+  const p = (async () => {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, mode: 'cors', cache: 'force-cache' });
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    return r.json();
+  })();
+  CACHE.set(url, p);
+  p.catch(() => CACHE.delete(url));
+  return p;
+}
+async function safe(promise, fallback) {
+  try { return await promise; } catch (e) { return fallback; }
+}
+
+/* ---------- persistence ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('chem.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('chem.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+let FAVS = store.get('favs', []);        // [{cid,title,formula}]
+let HIST = store.get('hist', []);        // [{cid,title,formula,ts}]
+const THEME = () => store.get('theme', 'dark');
+const applyTheme = t => { document.documentElement.dataset.theme = t; store.set('theme', t);
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = t === 'light' ? '#e9eef7' : '#05060a'; };
+applyTheme(THEME());
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 1900);
+}
+
+/* ---------- sheet ---------- */
+function sheet(html) { $('#sheetBody').innerHTML = html; $('#sheet').classList.add('open'); }
+function closeSheet() { $('#sheet').classList.remove('open'); }
+$('#sheet').addEventListener('click', e => { if (e.target.dataset.close) closeSheet(); });
+
+/* ---------- navigation ---------- */
+function go(hash, replace) {
+  if (replace) location.replace(hash); else location.hash = hash;
+  if (replace) render();
+}
+function parseHash() {
+  const h = location.hash.replace(/^#\/?/, '');
+  const p = h.split('/');
+  if (p[0] === 'c' && p[1]) return { v: 'compound', cid: p[1], tab: p[2] || 'overview' };
+  if (p[0] === 'q' && p[1]) return { v: 'results', term: decodeURIComponent(p[1]) };
+  if (p[0] === 'elements') return { v: 'elements' };
+  if (p[0] === 'saved') return { v: 'saved' };
+  if (p[0] === 'about') return { v: 'about' };
+  return { v: 'home' };
+}
+function setNav(v) {
+  const map = { home: 'home', results: 'home', compound: 'home', elements: 'elements', saved: 'saved', about: 'about' };
+  $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.nav === map[v]));
+}
+window.addEventListener('hashchange', render);
+
+/* =========================================================================
+   SEARCH
+   ========================================================================= */
+const KIND = q => {
+  if (/^\d{1,9}$/.test(q)) return 'cid';
+  if (/^[A-Z]{14}-[A-Z]{10}-[A-Z]$/.test(q)) return 'inchikey';
+  if (/^([A-Z][a-z]?\d*)+$/.test(q) && /\d/.test(q)) return 'formula';
+  return 'name';
+};
+
+async function resolveCIDs(q) {
+  const enc = encodeURIComponent(q);
+  const tries = [];
+  const k = KIND(q);
+  if (k === 'cid') tries.push(`${PUG}/compound/cid/${enc}/cids/JSON`);
+  tries.push(`${PUG}/compound/name/${enc}/cids/JSON`);
+  if (k === 'inchikey') tries.push(`${PUG}/compound/inchikey/${enc}/cids/JSON`);
+  if (k === 'formula') tries.push(`${PUG}/compound/fastformula/${enc}/cids/JSON`);
+  tries.push(`${PUG}/compound/smiles/${enc}/cids/JSON`);
+  tries.push(`${PUG}/compound/fastidentity/smiles/${enc}/cids/JSON`);
+  tries.push(`${PUG}/compound/fastformula/${enc}/cids/JSON`);
+  let lastErr = null;
+  for (const url of tries) {
+    try {
+      const j = await getJSON(url);
+      const ids = (j.IdentifierList && j.IdentifierList.CID) || [];
+      if (ids.length) return ids;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('not found');
+}
+
+async function batchProps(cids) {
+  const list = cids.slice(0, 60).join(',');
+  const url = `${PUG}/compound/cid/${list}/property/Title,MolecularFormula,MolecularWeight,IUPACName/JSON`;
+  const j = await getJSON(url);
+  return (j.PropertyTable && j.PropertyTable.Properties) || [];
+}
+
+function resultRow(p) {
+  const cid = p.CID;
+  const img = `${PUG}/compound/cid/${cid}/PNG?image_size=small`;
+  return `<div class="glass result" data-cid="${cid}">
+    <img src="${img}" alt="" loading="lazy">
+    <div class="grow">
+      <div class="nm truncate">${esc(p.Title || 'CID ' + cid)}</div>
+      <div class="mt mono">CID ${cid} · ${esc(p.MolecularFormula || '—')} · ${esc(p.MolecularWeight || '—')} g/mol</div>
+    </div>
+    <div class="faint">›</div>
+  </div>`;
+}
+
+/* =========================================================================
+   VIEWS
+   ========================================================================= */
+function render() {
+  const r = parseHash();
+  setNav(r.v);
+  closeSheet();
+  view().scrollTop = 0;
+  if (r.v === 'compound') return renderCompound(r.cid, r.tab);
+  if (r.v === 'results') return renderResults(r.term);
+  if (r.v === 'elements') return renderElements();
+  if (r.v === 'saved') return renderSaved();
+  if (r.v === 'about') return renderAbout();
+  return renderHome();
+}
+
+/* ---------- home ---------- */
+const POPULAR = [
+  ['Aspirin', 2244], ['Caffeine', 2519], ['Ibuprofen', 3672], ['Glucose', 5793],
+  ['Ethanol', 702], ['Water', 962], ['Paracetamol', 1983], ['Penicillin G', 5904],
+  ['Serotonin', 5202], ['Capsaicin', 1548943]
+];
+
+function renderHome() {
+  const favs = FAVS.slice(0, 4);
+  const hist = HIST.slice(0, 6);
+  view().innerHTML = `
+    <div class="hero">
+      <h1>Every molecule,<br><em>one search away.</em></h1>
+      <p>Structures, properties, safety, bioassays, spectra and literature — straight from PubChem.</p>
+    </div>
+
+    <div class="searchwrap">
+      <div class="glass search">
+        <span class="faint">⌕</span>
+        <input id="q" type="search" placeholder="Name, CID, SMILES, InChIKey, formula…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button class="go" id="goBtn" aria-label="Search">→</button>
+      </div>
+      <div id="sug"></div>
+    </div>
+
+    <div class="chips">
+      ${POPULAR.map(([n, c]) => `<button class="chip" data-pop="${c}">${esc(n)}</button>`).join('')}
+    </div>
+
+    <h2 class="sec">Jump back in</h2>
+    ${hist.length ? hist.map(h => `<div class="glass result" data-cid="${h.cid}">
+        <img src="${PUG}/compound/cid/${h.cid}/PNG?image_size=small" alt="" loading="lazy">
+        <div class="grow"><div class="nm truncate">${esc(h.title || 'CID ' + h.cid)}</div>
+        <div class="mt mono">CID ${h.cid} · ${esc(h.formula || '')}</div></div><div class="faint">›</div></div>`).join('')
+      : `<div class="glass card"><div class="muted small">Nothing yet — search a compound to begin.</div></div>`}
+
+    ${favs.length ? `<h2 class="sec">Saved</h2>
+      ${favs.map(f => `<div class="glass result" data-cid="${f.cid}">
+        <img src="${PUG}/compound/cid/${f.cid}/PNG?image_size=small" alt="" loading="lazy">
+        <div class="grow"><div class="nm truncate">${esc(f.title || 'CID ' + f.cid)}</div>
+        <div class="mt mono">CID ${f.cid} · ${esc(f.formula || '')}</div></div><div class="faint">★</div></div>`).join('')}` : ''}
+
+    <h2 class="sec">Coverage</h2>
+    <div class="grid2">
+      <div class="stat"><div class="n">118</div><div class="l">Elements</div></div>
+      <div class="stat"><div class="n">12</div><div class="l">Data sections</div></div>
+      <div class="stat"><div class="n">6</div><div class="l">Search modes</div></div>
+      <div class="stat"><div class="n">∞</div><div class="l">Compounds</div></div>
+    </div>
+
+    <div class="glass card" style="margin-top:14px">
+      <div class="row"><span class="badge">Powered by PubChem</span></div>
+      <p class="credit" style="margin-top:10px">
+        All chemical data in ChemSearch is retrieved live from
+        <a href="https://pubchem.ncbi.nlm.nih.gov" target="_blank" rel="noopener">PubChem</a>,
+        an open chemistry database at the U.S. National Library of Medicine (NCBI/NIH).
+        Please credit PubChem in any reuse of this data.
+      </p>
+    </div>`;
+
+  const q = $('#q');
+  let t;
+  q.addEventListener('input', () => {
+    clearTimeout(t);
+    const v = q.value.trim();
+    if (v.length < 2) { $('#sug').innerHTML = ''; return; }
+    t = setTimeout(() => suggest(v), 240);
+  });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') submit(q.value.trim()); });
+  $('#goBtn').addEventListener('click', () => submit(q.value.trim()));
+  $$('[data-pop]').forEach(b => b.addEventListener('click', () => go(`#/c/${b.dataset.pop}/overview`)));
+  $$('[data-cid]').forEach(el => el.addEventListener('click', () => go(`#/c/${el.dataset.cid}/overview`)));
+}
+
+function submit(q) {
+  if (!q) return;
+  go('#/q/' + encodeURIComponent(q));
+}
+
+async function suggest(term) {
+  const box = $('#sug'); if (!box) return;
+  try {
+    const j = await getJSON(`${AUTO}/${encodeURIComponent(term)}/json?limit=8`);
+    const list = (j.dictionary_terms && j.dictionary_terms.compound) || [];
+    if (!list.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="glass suggest">${list.map(x =>
+      `<button data-sug="${esc(x)}"><span class="dot"></span><span class="truncate">${esc(x)}</span></button>`).join('')}</div>`;
+    $$('[data-sug]', box).forEach(b => b.addEventListener('click', () => submit(b.dataset.sug)));
+  } catch (e) { box.innerHTML = ''; }
+}
+
+/* ---------- results ---------- */
+async function renderResults(term) {
+  view().innerHTML = `
+    <div class="chead">
+      <button class="icon-btn" data-back="1">‹</button>
+      <div class="title"><div class="sub">Results for</div><h2>${esc(term)}</h2></div>
+    </div>
+    <div id="rlist"><div class="spinner"></div></div>`;
+  $('[data-back]').addEventListener('click', () => go('#/'));
+  const box = $('#rlist');
+  try {
+    const ids = await resolveCIDs(term);
+    if (ids.length === 1) { go(`#/c/${ids[0]}/overview`, true); return; }
+    const props = await batchProps(ids);
+    box.innerHTML = `<div class="muted small" style="margin:0 4px 10px">${ids.length} matching record${ids.length > 1 ? 's' : ''} · showing ${Math.min(ids.length, 60)}</div>`
+      + props.map(resultRow).join('');
+    $$('[data-cid]', box).forEach(el => el.addEventListener('click', () => go(`#/c/${el.dataset.cid}/overview`)));
+  } catch (e) {
+    box.innerHTML = `<div class="glass card empty">No PubChem record matched “${esc(term)}”.<br>
+      <span class="tiny">Try a compound name, a CID number, a SMILES string or a formula.</span></div>`;
+  }
+}
+
+/* ---------- elements ---------- */
+async function renderElements() {
+  view().innerHTML = `
+    <div class="hero" style="margin-bottom:10px"><h1 style="font-size:26px">Periodic table</h1>
+    <p>118 elements, as published in the PubChem periodic table.</p></div>
+    <div class="glass card" id="ptcard"><div class="spinner"></div></div>`;
+  try {
+    const rows = await loadPeriodic();
+    if (!rows.length) throw new Error('empty');
+    const byZ = {}; rows.forEach(r => byZ[r.z] = r);
+    let html = '<div class="elwrap"><div class="ptable">';
+    rows.forEach(el => {
+      let g = +el.group, per = +el.period;
+      if (!g || !per) {
+        if (el.z >= 57 && el.z <= 71) { per = 8; g = el.z - 57 + 3; }
+        else if (el.z >= 89 && el.z <= 103) { per = 9; g = el.z - 89 + 3; }
+        else { return; }
+      }
+      html += `<div class="el" data-z="${el.z}" style="grid-column:${g};grid-row:${per};background:${esc(el.color)}">${esc(el.symbol)}<span>${el.z}</span></div>`;
+    });
+    html += '</div></div>';
+    $('#ptcard').innerHTML = `<div class="small muted" style="margin-bottom:10px">Tap an element for its PubChem properties.</div>` + html
+      + `<div class="btns"><button class="btn" id="elSearch">Search an element in PubChem</button></div>`;
+    $$('[data-z]').forEach(e => e.addEventListener('click', () => showElement(byZ[+e.dataset.z])));
+    $('#elSearch').addEventListener('click', () => go('#/'));
+  } catch (e) {
+    $('#ptcard').innerHTML = `<div class="empty">Could not load the PubChem periodic table.<br>
+      <span class="tiny">Check your connection and try again.</span></div>`;
+  }
+}
+
+let PT_ROWS = null;
+async function loadPeriodic() {
+  if (PT_ROWS) return PT_ROWS;
+  const j = await getJSON(`${PUG}/periodictable/JSON`);
+  const t = j.Table || j;
+  const cols = (t.Columns || []).map(c => (typeof c === 'string' ? c : c.Heading || ''));
+  const pick = (obj, ...names) => {
+    for (const n of names) {
+      const key = Object.keys(obj).find(k => k.toLowerCase().replace(/[^a-z]/g, '') === n.toLowerCase().replace(/[^a-z]/g, ''));
+      if (key && obj[key] !== '' && obj[key] != null) return obj[key];
+    }
+    return '';
+  };
+  PT_ROWS = (t.Row || []).map(r => {
+    const cells = (r.Cell || []).map(c => {
+      if (c == null) return '';
+      if (c.Value !== undefined) return c.Value;
+      if (c.Number !== undefined) return c.Number;
+      if (c.StringWithMarkup) return c.StringWithMarkup.map(s => s.String).join(' ');
+      return '';
+    });
+    const o = {}; cols.forEach((c, i) => o[c] = cells[i]);
+    return {
+      z: +(pick(o, 'AtomicNumber', 'Atomic Number') || 0),
+      group: pick(o, 'Group'),
+      period: pick(o, 'Period'),
+      symbol: pick(o, 'Symbol', 'Atomic Symbol'),
+      name: pick(o, 'Name', 'ElementName'),
+      mass: pick(o, 'AtomicMass', 'Atomic Mass', 'StandardAtomicWeight'),
+      color: pick(o, 'CPKHexColor', 'CPK Hex Color', 'Color') || '#8fa3b8',
+      raw: o
+    };
+  }).filter(x => x.z && x.symbol);
+  return PT_ROWS;
+}
+
+function showElement(el) {
+  const c = /^#?[0-9a-f]{6}$/i.test(el.color) ? el.color : '#8fa3b8';
+  const rows = Object.entries(el.raw).filter(([k, v]) => v !== '' && v != null && !/color|columninfo/i.test(k));
+  sheet(`
+    <div class="elcard">
+      <div class="elbig" style="background:${esc(c)}">${esc(el.symbol)}</div>
+      <div><div style="font-size:20px;font-weight:720;letter-spacing:-.5px">${esc(el.name)}</div>
+      <div class="mono muted small">Z = ${esc(el.z)} · ${esc(el.mass)} u</div></div>
+    </div>
+    <hr class="hair">
+    <dl class="props">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    <div class="btns"><button class="btn primary" id="elPC">Open in PubChem</button>
+      <button class="btn" data-close="1">Close</button></div>`);
+  $('#elPC').addEventListener('click', () => go('#/q/' + encodeURIComponent(el.name)));
+}
+
+/* ---------- saved ---------- */
+function renderSaved() {
+  view().innerHTML = `
+    <div class="hero" style="margin-bottom:14px"><h1 style="font-size:26px">Saved</h1>
+    <p>Compounds you starred, stored on this device.</p></div>
+    ${FAVS.length ? FAVS.map(f => `<div class="glass result" data-cid="${f.cid}">
+        <img src="${PUG}/compound/cid/${f.cid}/PNG?image_size=small" alt="" loading="lazy">
+        <div class="grow"><div class="nm truncate">${esc(f.title || 'CID ' + f.cid)}</div>
+        <div class="mt mono">CID ${f.cid} · ${esc(f.formula || '')}</div></div>
+        <button class="icon-btn" data-unfav="${f.cid}" aria-label="Remove">×</button></div>`).join('')
+      : `<div class="glass card empty">No saved compounds yet.<br><span class="tiny">Open a compound and tap the star.</span></div>`}
+    ${HIST.length ? `<h2 class="sec">History</h2>
+      <div class="glass card"><dl class="props">${HIST.map(h =>
+        `<div><dt class="mono">CID ${h.cid}</dt><dd><a href="#/c/${h.cid}/overview">${esc(h.title || 'CID ' + h.cid)}</a></dd></div>`).join('')}</dl></div>` : ''}
+    <div class="btns" style="margin-top:16px"><button class="btn danger" id="clearHist">Clear history</button></div>`;
+  $$('[data-cid]').forEach(el => el.addEventListener('click', e => {
+    if (e.target.dataset.unfav) return;
+    go(`#/c/${el.dataset.cid}/overview`);
+  }));
+  $$('[data-unfav]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    FAVS = FAVS.filter(f => String(f.cid) !== b.dataset.unfav); store.set('favs', FAVS); renderSaved(); toast('Removed');
+  }));
+  const c = $('#clearHist'); if (c) c.addEventListener('click', () => { HIST = []; store.set('hist', HIST); renderSaved(); toast('History cleared'); });
+}
+
+/* ---------- about ---------- */
+function renderAbout() {
+  view().innerHTML = `
+    <div class="hero" style="margin-bottom:14px"><h1 style="font-size:26px">About ChemSearch</h1>
+    <p>A liquid-glass client for the PubChem database.</p></div>
+    <div class="glass card about">
+      <div class="row"><span class="badge">Data: PubChem</span></div>
+      <h3>Credit</h3>
+      <p>All chemical records in this app are served by <a href="https://pubchem.ncbi.nlm.nih.gov" target="_blank" rel="noopener">PubChem</a>,
+      an open chemistry database maintained by the National Center for Biotechnology Information (NCBI),
+      part of the U.S. National Library of Medicine at the National Institutes of Health.</p>
+      <p>If you use these records in your own work, please cite:</p>
+      <p class="mono small">Kim S, Chen J, Cheng T, et al. PubChem 2025 update. Nucleic Acids Research. 2025;53(D1):D1516–D1525. doi:10.1093/nar/gkae1059</p>
+      <p>PubChem data is in the public domain. ChemSearch is an independent client and is not endorsed by or affiliated with NCBI or NIH.</p>
+      <hr class="hair">
+      <h3>What you can look up</h3>
+      <p>Search by name, CID, SMILES, InChIKey or molecular formula. Each record exposes 12 sections: overview,
+      computed properties, structure (2D + 3D), chemical &amp; physical properties, safety &amp; hazards (GHS),
+      bioactivity and bioassays, literature, patents, classification (MeSH, ChEBI, KEGG, ATC), spectra,
+      uses &amp; manufacturing, and vendors — plus similar-structure search and raw downloads.</p>
+      <hr class="hair">
+      <h3>API endpoints used</h3>
+      <p class="mono small">PUG REST · /rest/pug/compound/…<br>PUG View · /rest/pug_view/data/compound/…<br>Autocomplete · /rest/autocomplete/compound/…<br>Periodic table · /rest/pug/periodictable/JSON</p>
+      <hr class="hair">
+      <h3>Privacy</h3>
+      <p>No accounts, no analytics, no tracking. Search history and favourites stay in this device's local storage.
+      Queries go only to pubchem.ncbi.nlm.nih.gov.</p>
+      <hr class="hair">
+      <h3>Disclaimer</h3>
+      <p>Data is provided as-is by PubChem and may be incomplete or out of date. Do not use it as the sole basis for
+      medical, safety, legal or regulatory decisions.</p>
+    </div>
+    <div class="glass card"><div class="row"><div class="grow">
+      <div style="font-weight:650">ChemSearch</div>
+      <div class="tiny muted">Version 1.0.0 · single-file web app · Android WebView shell</div>
+    </div><span class="badge">v1.0.0</span></div></div>`;
+}
+/* =========================================================================
+   COMPOUND VIEW
+   ========================================================================= */
+const TABS = [
+  ['overview', 'Overview'], ['props', 'Properties'], ['struct', 'Structure'],
+  ['phys', 'Physical'], ['safety', 'Safety'], ['bio', 'Bioactivity'],
+  ['lit', 'Literature'], ['patents', 'Patents'], ['classes', 'Classes'],
+  ['spectra', 'Spectra'], ['uses', 'Uses'], ['vendors', 'Vendors'],
+  ['similar', 'Similar'], ['download', 'Download']
+];
+
+const PROP_FIELDS = ['Title', 'MolecularFormula', 'MolecularWeight', 'ExactMass', 'MonoisotopicMass',
+  'IUPACName', 'TraditionalIUPACName', 'CanonicalSMILES', 'IsomericSMILES', 'InChI', 'InChIKey',
+  'XLogP', 'Charge', 'HBondDonorCount', 'HBondAcceptorCount', 'RotatableBondCount', 'HeavyAtomCount',
+  'IsotopeAtomCount', 'AtomStereoCount', 'DefinedAtomStereoCount', 'UndefinedAtomStereoCount',
+  'BondStereoCount', 'DefinedBondStereoCount', 'UndefinedBondStereoCount', 'CovalentUnitCount',
+  'TPSA', 'Complexity', 'EffectiveRotorCount', 'ConformerCount3D', 'ConformerCount2D'];
+
+const CP = new Map(); // cid -> {props, synonyms}
+
+async function loadCore(cid) {
+  if (CP.has(cid)) return CP.get(cid);
+  const p = (async () => {
+    let props = {};
+    try {
+      const j = await getJSON(`${PUG}/compound/cid/${cid}/property/${PROP_FIELDS.join(',')}/JSON`);
+      props = (j.PropertyTable && j.PropertyTable.Properties && j.PropertyTable.Properties[0]) || {};
+    } catch (e) {
+      const j = await getJSON(`${PUG}/compound/cid/${cid}/property/Title,MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES,InChIKey/JSON`);
+      props = (j.PropertyTable && j.PropertyTable.Properties && j.PropertyTable.Properties[0]) || {};
+    }
+    const syn = await safe(getJSON(`${PUG}/compound/cid/${cid}/synonyms/JSON`), null);
+    const synonyms = (syn && syn.InformationList && syn.InformationList.Information[0] &&
+      syn.InformationList.Information[0].Synonym) || [];
+    const out = { props, synonyms };
+    CP.set(cid, out);
+    return out;
+  })();
+  CP.set(cid, p);
+  return p;
+}
+
+function addHistory(cid, props) {
+  HIST = [{ cid: String(cid), title: props.Title || 'CID ' + cid, formula: props.MolecularFormula || '', ts: Date.now() }]
+    .concat(HIST.filter(h => String(h.cid) !== String(cid))).slice(0, 20);
+  store.set('hist', HIST);
+}
+const isFav = cid => FAVS.some(f => String(f.cid) === String(cid));
+
+async function renderCompound(cid, tab) {
+  view().innerHTML = `
+    <div class="chead">
+      <button class="icon-btn" data-back="1">‹</button>
+      <div class="title"><div class="sub">PubChem compound</div><h2 id="cTitle">CID ${esc(cid)}</h2></div>
+      <button class="icon-btn" id="favBtn" aria-label="Save">☆</button>
+    </div>
+    <div class="segs">${TABS.map(([k, n]) => `<button class="seg${k === tab ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('')}</div>
+    <div id="tabBody"><div class="spinner"></div></div>`;
+
+  $('[data-back]').addEventListener('click', () => history.length > 1 ? history.back() : go('#/'));
+  $$('[data-tab]').forEach(b => b.addEventListener('click', () => {
+    $$('.seg').forEach(s => s.classList.toggle('on', s === b));
+    go(`#/c/${cid}/${b.dataset.tab}`, true);
+  }));
+
+  let core;
+  try {
+    core = await loadCore(cid);
+  } catch (e) {
+    $('#tabBody').innerHTML = `<div class="glass card empty">This PubChem record could not be loaded.<br>
+      <span class="tiny">It may not exist, or the network is unavailable.</span></div>`;
+    return;
+  }
+  const p = core.props;
+  $('#cTitle').textContent = p.Title || ('CID ' + cid);
+  document.title = (p.Title || 'CID ' + cid) + ' — ChemSearch';
+  addHistory(cid, p);
+  const fb = $('#favBtn');
+  fb.textContent = isFav(cid) ? '★' : '☆';
+  fb.addEventListener('click', () => {
+    if (isFav(cid)) { FAVS = FAVS.filter(f => String(f.cid) !== String(cid)); toast('Removed from saved'); }
+    else { FAVS.unshift({ cid: String(cid), title: p.Title || 'CID ' + cid, formula: p.MolecularFormula || '' }); toast('Saved'); }
+    store.set('favs', FAVS); fb.textContent = isFav(cid) ? '★' : '☆';
+  });
+
+  const body = $('#tabBody');
+  const set = html => { body.innerHTML = html; };
+  const loader = `<div class="spinner"></div>`;
+
+  switch (tab) {
+    case 'overview': return overview(cid, p, core.synonyms, set);
+    case 'props':    return propsTab(cid, p, core.synonyms, set, loader);
+    case 'struct':   return structTab(cid, p, set);
+    case 'phys':     return pvTab(cid, 'Chemical and Physical Properties', set, loader, 'Physical & chemical properties');
+    case 'safety':   return safetyTab(cid, set, loader);
+    case 'bio':      return bioTab(cid, p, set, loader);
+    case 'lit':      return litTab(cid, set, loader);
+    case 'patents':  return patentsTab(cid, set, loader);
+    case 'classes':  return pvTab(cid, 'Classification', set, loader, 'Classification');
+    case 'spectra':  return pvTab(cid, 'Spectral Information', set, loader, 'Spectra');
+    case 'uses':     return usesTab(cid, set, loader);
+    case 'vendors':  return pvTab(cid, 'Chemical Vendors', set, loader, 'Vendors');
+    case 'similar':  return similarTab(cid, p, set, loader);
+    case 'download': return downloadTab(cid, p, set);
+    default:         return overview(cid, p, core.synonyms, set);
+  }
+}
+
+/* ---------- shared bits ---------- */
+function copy(text) {
+  const done = () => toast('Copied');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallback());
+  } else fallback();
+  function fallback() {
+    const ta = document.createElement('textarea'); ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed'); }
+    document.body.removeChild(ta);
+  }
+}
+const kv = (k, v, wide) => `<div class="cell${wide ? ' wide' : ''}"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`;
+const img2d = (cid, size) => `${PUG}/compound/cid/${cid}/PNG?image_size=${size || 'large'}`;
+const img3d = (cid, size) => `${PUG}/compound/cid/${cid}/PNG?record_type=3d&image_size=${size || 'large'}`;
+
+/* ---------- overview ---------- */
+function overview(cid, p, synonyms, set) {
+  const ident = [];
+  if (p.CanonicalSMILES) ident.push(['SMILES', p.CanonicalSMILES]);
+  if (p.IsomericSMILES && p.IsomericSMILES !== p.CanonicalSMILES) ident.push(['Isomeric SMILES', p.IsomericSMILES]);
+  if (p.InChIKey) ident.push(['InChIKey', p.InChIKey]);
+  if (p.InChI) ident.push(['InChI', p.InChI]);
+
+  set(`
+    <div class="glass card" style="padding:14px">
+      <div class="structbox" id="sb"><img class="inv" src="${img2d(cid)}" alt="2D structure of ${esc(p.Title || 'CID ' + cid)}" loading="lazy"></div>
+      <div style="margin-top:14px">
+        <div style="font-size:21px;font-weight:740;letter-spacing:-.7px;line-height:1.2">${esc(p.Title || 'CID ' + cid)}</div>
+        ${p.IUPACName ? `<div class="small muted" style="margin-top:3px">${esc(p.IUPACName)}</div>` : ''}
+        <div class="tags">
+          <span class="tag mono">CID ${esc(cid)}</span>
+          ${p.MolecularFormula ? `<span class="tag mono">${esc(p.MolecularFormula)}</span>` : ''}
+          ${p.MolecularWeight ? `<span class="tag mono">${esc(p.MolecularWeight)} g/mol</span>` : ''}
+          ${p.Charge !== undefined ? `<span class="tag mono">charge ${esc(p.Charge)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="glass card">
+      <div class="kv">
+        ${kv('Molecular formula', esc(fmt(p.MolecularFormula)))}
+        ${kv('Molecular weight', esc(fmt(p.MolecularWeight)) + ' <span class="faint tiny">g/mol</span>')}
+        ${kv('Exact mass', esc(fmt(p.ExactMass || p.MonoisotopicMass)))}
+        ${kv('XLogP3', esc(fmt(p.XLogP)))}
+        ${kv('H-bond donors', esc(fmt(p.HBondDonorCount)))}
+        ${kv('H-bond acceptors', esc(fmt(p.HBondAcceptorCount)))}
+        ${kv('Rotatable bonds', esc(fmt(p.RotatableBondCount)))}
+        ${kv('Topological PSA', esc(fmt(p.TPSA)) + ' <span class="faint tiny">Å²</span>')}
+        ${kv('Heavy atoms', esc(fmt(p.HeavyAtomCount)))}
+        ${kv('Complexity', esc(fmt(p.Complexity)))}
+      </div>
+    </div>
+
+    ${ident.length ? `<div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Identifiers</h2>
+      <dl class="props">${ident.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="mono">${esc(v)}</dd></div>`).join('')}</dl>
+      <div class="btns"><button class="btn" data-copy="${esc(p.CanonicalSMILES || '')}">Copy SMILES</button>
+      <button class="btn" data-copy="${esc(p.InChIKey || '')}">Copy InChIKey</button></div>
+    </div>` : ''}
+
+    <div class="glass card" id="glance"><div class="spinner" style="margin:10px auto"></div></div>
+
+    ${synonyms.length ? `<div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Also known as</h2>
+      <div class="tags">${synonyms.slice(0, 18).map(s => `<span class="tag">${esc(s)}</span>`).join('')}</div>
+      ${synonyms.length > 18 ? `<div class="tiny faint" style="margin-top:8px">+ ${synonyms.length - 18} more synonyms in PubChem</div>` : ''}
+    </div>` : ''}
+
+    <div class="btns">
+      <button class="btn primary" id="btn3d">View 3D</button>
+      <button class="btn" id="btnSim">Similar structures</button>
+      <a class="btn" href="${WEB}/${cid}" target="_blank" rel="noopener">PubChem page ↗</a>
+    </div>`);
+
+  $$('[data-copy]').forEach(b => b.addEventListener('click', () => copy(b.dataset.copy)));
+  const b3 = $('#btn3d'); if (b3) b3.addEventListener('click', () => sheet(`
+    <div style="font-weight:700;font-size:17px;margin-bottom:10px">${esc(p.Title || 'CID ' + cid)} · 3D conformer</div>
+    <div class="structbox" style="min-height:0"><img src="${img3d(cid)}" alt="3D conformer" style="max-height:44vh"></div>
+    <p class="credit" style="margin-top:10px">Conformer computed by PubChem from the deposited 3D record.
+    ${p.ConformerCount3D ? 'PubChem holds ' + esc(p.ConformerCount3D) + ' 3D conformer(s) for this compound.' : ''}</p>
+    <div class="btns"><a class="btn" href="${PUG}/compound/cid/${cid}/SDF?record_type=3d" target="_blank" rel="noopener">Download 3D SDF</a>
+    <button class="btn" data-close="1">Close</button></div>`));
+  const bs = $('#btnSim'); if (bs) bs.addEventListener('click', () => go(`#/c/${cid}/similar`, true));
+
+  // safety glance
+  (async () => {
+    const rec = await safe(pvHeading(cid, 'Safety and Hazards'), null);
+    const box = $('#glance'); if (!box) return;
+    if (!rec) { box.innerHTML = `<h2 class="sec" style="margin:0 0 6px">Safety</h2>
+      <div class="muted small">No GHS hazard summary is recorded for this compound.</div>`; return; }
+    const ghs = collectGHS(rec);
+    box.innerHTML = `<h2 class="sec" style="margin:0 0 8px">Safety at a glance</h2>
+      ${ghs.pictograms.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        ${ghs.pictograms.map(u => `<img src="${esc(u)}" alt="GHS pictogram" style="width:62px;height:62px;object-fit:contain;background:#fff;border-radius:12px;padding:4px;border:2px solid #e33">`).join('')}</div>` : ''}
+      ${ghs.signal ? `<div class="tags"><span class="tag" style="border-color:rgba(255,107,129,.5);color:var(--danger)">Signal: ${esc(ghs.signal)}</span></div>` : ''}
+      ${ghs.hazards.length ? `<ul style="margin:10px 0 0;padding-left:18px;font-size:13.5px">${ghs.hazards.slice(0, 6).map(h => `<li style="margin-bottom:4px">${esc(h)}</li>`).join('')}</ul>` : ''}
+      ${!ghs.pictograms.length && !ghs.signal && !ghs.hazards.length ? `<div class="muted small">PubChem has no GHS classification for this record.</div>` : ''}
+      <div class="btns"><button class="btn" id="moreSafety">Full safety data</button></div>`;
+    const m = $('#moreSafety'); if (m) m.addEventListener('click', () => go(`#/c/${cid}/safety`, true));
+  })();
+}
+
+/* ---------- properties ---------- */
+function propsTab(cid, p, synonyms, set, loader) {
+  const rows = PROP_FIELDS.filter(k => p[k] !== undefined && p[k] !== '').map(k => [k, p[k]]);
+  set(`
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Computed descriptors</h2>
+      <dl class="props">${rows.map(([k, v]) => `<div><dt>${esc(humanKey(k))}</dt><dd class="mono">${esc(v)}</dd></div>`).join('')}</dl>
+    </div>
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">All PubChem synonyms <span class="faint">(${synonyms.length})</span></h2>
+      <div class="tags">${synonyms.slice(0, 80).map(s => `<span class="tag">${esc(s)}</span>`).join('') || '<span class="muted small">None recorded</span>'}</div>
+      ${synonyms.length > 80 ? `<div class="tiny faint" style="margin-top:8px">Showing 80 of ${synonyms.length}.</div>` : ''}
+    </div>
+    <div id="physInline">${loader}</div>`);
+  pvTab(cid, 'Chemical and Physical Properties', html => {
+    const box = $('#physInline');
+    if (box) box.innerHTML = html.replace('class="glass card"', 'class="glass card"');
+  }, loader, '', true);
+}
+
+const KEY_LABELS = {
+  Title: 'PubChem title', MolecularFormula: 'Molecular formula', MolecularWeight: 'Molecular weight (g/mol)',
+  ExactMass: 'Exact mass (Da)', MonoisotopicMass: 'Monoisotopic mass (Da)', IUPACName: 'IUPAC name',
+  TraditionalIUPACName: 'Traditional IUPAC name', CanonicalSMILES: 'Canonical SMILES',
+  IsomericSMILES: 'Isomeric SMILES', InChI: 'InChI', InChIKey: 'InChIKey', XLogP: 'XLogP3',
+  Charge: 'Formal charge', HBondDonorCount: 'H-bond donors', HBondAcceptorCount: 'H-bond acceptors',
+  RotatableBondCount: 'Rotatable bonds', HeavyAtomCount: 'Heavy atoms', IsotopeAtomCount: 'Isotope atoms',
+  AtomStereoCount: 'Atom stereo centres', DefinedAtomStereoCount: 'Defined atom stereo',
+  UndefinedAtomStereoCount: 'Undefined atom stereo', BondStereoCount: 'Bond stereo centres',
+  DefinedBondStereoCount: 'Defined bond stereo', UndefinedBondStereoCount: 'Undefined bond stereo',
+  CovalentUnitCount: 'Covalent units', TPSA: 'Topological polar surface area (Å²)',
+  Complexity: 'Complexity', EffectiveRotorCount: 'Effective rotor count',
+  ConformerCount3D: '3D conformers', ConformerCount2D: '2D conformers'
+};
+function humanKey(k) { return KEY_LABELS[k] || k; }
+
+/* ---------- structure ---------- */
+function structTab(cid, p, set) {
+  set(`
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">2D structure</h2>
+      <div class="structbox"><img class="inv" src="${img2d(cid)}" alt="2D structure"></div>
+      <div class="btns"><a class="btn" href="${img2d(cid)}" target="_blank" rel="noopener">Open PNG</a>
+        <a class="btn" href="${PUG}/compound/cid/${cid}/SDF" target="_blank" rel="noopener">2D SDF</a></div>
+    </div>
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">3D conformer</h2>
+      <div class="structbox"><img src="${img3d(cid)}" alt="3D conformer" loading="lazy"></div>
+      ${p.ConformerCount3D ? `<div class="tiny muted" style="margin-top:8px">${esc(p.ConformerCount3D)} conformer(s) · ${esc(p.ConformerCount2D || '—')} 2D conformer(s)</div>` : ''}
+      <div class="btns"><a class="btn" href="${PUG}/compound/cid/${cid}/SDF?record_type=3d" target="_blank" rel="noopener">Download 3D SDF</a></div>
+    </div>
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Stereochemistry</h2>
+      <div class="kv">
+        ${kv('Defined atom stereo', esc(fmt(p.DefinedAtomStereoCount)))}
+        ${kv('Undefined atom stereo', esc(fmt(p.UndefinedAtomStereoCount)))}
+        ${kv('Defined bond stereo', esc(fmt(p.DefinedBondStereoCount)))}
+        ${kv('Undefined bond stereo', esc(fmt(p.UndefinedBondStereoCount)))}
+        ${kv('Isotope atoms', esc(fmt(p.IsotopeAtomCount)))}
+        ${kv('Covalent units', esc(fmt(p.CovalentUnitCount)))}
+      </div>
+    </div>`);
+}
+
+/* =========================================================================
+   PUG VIEW — generic renderer
+   ========================================================================= */
+async function pvHeading(cid, heading) {
+  const j = await getJSON(`${PVW}/${cid}/JSON?heading=${encodeURIComponent(heading)}`);
+  return j.Record || null;
+}
+function findSection(rec, name) {
+  if (!rec) return null;
+  const stack = (rec.Section || []).slice();
+  while (stack.length) {
+    const s = stack.shift();
+    if (s.TOCHeading === name) return s;
+    if (s.Section) stack.push.apply(stack, s.Section);
+  }
+  return null;
+}
+function allSections(rec, name, out) {
+  out = out || [];
+  if (!rec) return out;
+  const stack = (rec.Section || []).slice();
+  while (stack.length) {
+    const s = stack.shift();
+    if (s.TOCHeading === name) out.push(s);
+    if (s.Section) stack.push.apply(stack, s.Section);
+  }
+  return out;
+}
+
+function pvInfo(info) {
+  const v = info.Value || {};
+  const bits = [];
+  if (v.StringWithMarkup) {
+    v.StringWithMarkup.forEach(sm => {
+      const txt = esc(sm.String || '');
+      const imgs = (sm.Markup || []).filter(m => m.URL)
+        .map(m => `<img src="${esc(m.URL)}" alt="" loading="lazy" style="max-height:90px;width:auto;display:inline-block;margin:4px 6px 0 0">`).join('');
+      if (txt || imgs) bits.push(`<div class="ival">${txt}${imgs ? '<div>' + imgs + '</div>' : ''}</div>`);
+    });
+  }
+  if (v.Number !== undefined && v.Number !== null) {
+    const unit = (v.Unit && v.Unit.length) ? ' ' + v.Unit.map(u => u.Name).filter(Boolean).join(' ') : '';
+    bits.push(`<div class="ival">${esc(v.Number)}${esc(unit)}</div>`);
+  }
+  if (v.Table) bits.push(pvTable(v.Table));
+  if (v.Binary && (v.Binary.Base64String || v.Binary['Base64String'])) {
+    const b64 = v.Binary.Base64String || v.Binary['Base64String'];
+    bits.push(`<img src="data:${esc(v.Binary.MIMEType || 'image/png')};base64,${b64}" alt="">`);
+  }
+  if (!bits.length) return '';
+  return `<div class="info">${info.Name ? `<div class="iname">${esc(info.Name)}</div>` : ''}${bits.join('')}</div>`;
+}
+
+function pvTable(t) {
+  const cols = (t.Columns || []).map(c => (typeof c === 'string' ? c : (c.Heading || '')));
+  const rows = (t.Row || []).map(r => (r.Cell || []).map(c => {
+    if (c == null) return '';
+    if (c.StringWithMarkup) return c.StringWithMarkup.map(s => esc(s.String || '')).join(' ');
+    if (c.Number !== undefined) return esc(c.Number);
+    if (c.Binary) return '<em>binary</em>';
+    return '';
+  }));
+  if (!rows.length) return '';
+  return `<table>${cols.length ? '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>' : ''}
+    ${rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('')}</table>`;
+}
+
+function pvNode(sec, depth, maxDepth) {
+  if (depth > maxDepth) return '';
+  let inner = '';
+  (sec.Information || []).forEach(i => { inner += pvInfo(i); });
+  (sec.Section || []).forEach(s => { inner += pvNode(s, depth + 1, maxDepth); });
+  if (!inner.trim()) return '';
+  return `<div class="pvs"><h4>${esc(sec.TOCHeading || '')}</h4>${inner}</div>`;
+}
+
+function renderPV(rec, maxDepth) {
+  if (!rec || !rec.Section) return '';
+  let out = '';
+  rec.Section.forEach(s => { out += pvNode(s, 1, maxDepth || 4); });
+  return out;
+}
+
+/* ---------- generic PUG View tab ---------- */
+async function pvTab(cid, heading, set, loader, title, inline) {
+  const paint = html => { if (inline) set(html); else set(html); };
+  if (!inline) set(loader);
+  const rec = await safe(pvHeading(cid, heading), null);
+  if (!rec) {
+    paint(`<div class="glass card empty">
+      <div style="font-weight:650;margin-bottom:6px">${esc(title || heading)}</div>
+      PubChem holds no “${esc(heading)}” section for this compound.</div>`);
+    return;
+  }
+  const body = renderPV(rec, 4);
+  paint(`<div class="glass card pv">
+      <h2 class="sec" style="margin:0 0 6px">${esc(title || heading)}</h2>
+      ${body || '<div class="muted small">This section is present but has no readable entries.</div>'}
+    </div>
+    <div class="credit" style="margin:0 4px 12px">Source: PubChem record ${esc(rec.RecordNumber || cid)} —
+      <a href="${WEB}/${cid}" target="_blank" rel="noopener">view on PubChem ↗</a></div>`);
+}
+
+/* ---------- safety ---------- */
+function collectGHS(rec) {
+  const out = { pictograms: [], signal: '', hazards: [] };
+  const ghs = findSection(rec, 'GHS Classification') || rec.Section && rec.Section[0];
+  const walk = (sec) => {
+    (sec.Information || []).forEach(i => {
+      const nm = (i.Name || '').toLowerCase();
+      const sw = i.Value && i.Value.StringWithMarkup;
+      if (sw) sw.forEach(sm => {
+        (sm.Markup || []).forEach(m => {
+          if (m.URL && /ghs|pictogram/i.test(m.URL + ' ' + (m.Type || '')) && out.pictograms.indexOf(m.URL) < 0)
+            out.pictograms.push(m.URL);
+        });
+        const txt = (sm.String || '').trim();
+        if (nm === 'signal' && txt) out.signal = txt;
+        if (/hazard statement/i.test(nm) && txt) out.hazards.push(txt);
+      });
+    });
+    (sec.Section || []).forEach(walk);
+  };
+  if (ghs) walk(ghs);
+  out.hazards = Array.from(new Set(out.hazards)).slice(0, 14);
+  return out;
+}
+
+async function safetyTab(cid, set, loader) {
+  set(loader);
+  const rec = await safe(pvHeading(cid, 'Safety and Hazards'), null);
+  if (!rec) {
+    set(`<div class="glass card empty">PubChem holds no “Safety and Hazards” section for this compound.</div>`);
+    return;
+  }
+  const g = collectGHS(rec);
+  set(`
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 10px">GHS hazard summary</h2>
+      ${g.pictograms.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        ${g.pictograms.map(u => `<img src="${esc(u)}" alt="GHS pictogram" style="width:66px;height:66px;object-fit:contain;background:#fff;border-radius:12px;padding:4px;border:2px solid #e33">`).join('')}</div>`
+        : '<div class="muted small" style="margin-bottom:8px">No GHS pictograms recorded.</div>'}
+      ${g.signal ? `<div class="tags"><span class="tag" style="border-color:rgba(255,107,129,.5);color:var(--danger)">Signal word: ${esc(g.signal)}</span></div>` : ''}
+      ${g.hazards.length ? `<ul style="margin:10px 0 0;padding-left:18px;font-size:13.5px">${g.hazards.map(h => `<li style="margin-bottom:5px">${esc(h)}</li>`).join('')}</ul>` : ''}
+      <p class="credit" style="margin-top:12px">GHS classification is depositor-supplied in PubChem and may vary between sources.
+      Always consult the safety data sheet of the supplier you use.</p>
+    </div>
+    <div class="glass card pv">
+      <h2 class="sec" style="margin:0 0 6px">Full safety &amp; hazards record</h2>
+      ${renderPV(rec, 4)}
+    </div>
+    <div class="btns"><a class="btn" href="${WEB}/${cid}#Safety-and-Hazards" target="_blank" rel="noopener">Open on PubChem ↗</a></div>`);
+}
+
+/* ---------- bioactivity ---------- */
+async function bioTab(cid, p, set, loader) {
+  set(loader);
+  const [rec, aids] = await Promise.all([
+    safe(pvHeading(cid, 'BioAssay Results'), null),
+    safe(getJSON(`${PUG}/compound/cid/${cid}/aids/JSON`), null)
+  ]);
+  const ids = (aids && aids.IdentifierList && aids.IdentifierList.AID) || [];
+  set(`
+    <div class="glass card">
+      <div class="grid2">
+        <div class="stat"><div class="n">${ids.length}</div><div class="l">BioAssays</div></div>
+        <div class="stat"><div class="n">${ids.length ? '✓' : '—'}</div><div class="l">Assays linked</div></div>
+      </div>
+      ${ids.length ? `<div class="tags" style="margin-top:12px">${ids.slice(0, 60).map(a =>
+        `<a class="tag mono" href="https://pubchem.ncbi.nlm.nih.gov/bioassay/${a}" target="_blank" rel="noopener">AID ${a}</a>`).join('')}</div>
+        ${ids.length > 60 ? `<div class="tiny faint" style="margin-top:8px">Showing 60 of ${ids.length} assays.</div>` : ''}`
+        : '<div class="muted small" style="margin-top:12px">This compound does not appear in any PubChem bioassay.</div>'}
+    </div>
+    ${rec ? `<div class="glass card pv"><h2 class="sec" style="margin:0 0 6px">BioAssay summary</h2>${renderPV(rec, 3)}</div>` : ''}`);
+}
+
+/* ---------- literature ---------- */
+async function litTab(cid, set, loader) {
+  set(loader);
+  const [rec, pm] = await Promise.all([
+    safe(pvHeading(cid, 'Literature'), null),
+    safe(getJSON(`${PUG}/compound/cid/${cid}/xrefs/PubMedID/JSON`), null)
+  ]);
+  const pmids = (pm && pm.InformationList && pm.InformationList.Information[0] && pm.InformationList.Information[0].PubMedID) || [];
+  set(`
+    <div class="glass card">
+      <div class="grid2">
+        <div class="stat"><div class="n">${pmids.length}</div><div class="l">PubMed citations</div></div>
+        <div class="stat"><div class="n">${rec ? '✓' : '—'}</div><div class="l">Literature section</div></div>
+      </div>
+      ${pmids.length ? `<div class="tags" style="margin-top:12px">${pmids.slice(0, 40).map(id =>
+        `<a class="tag mono" href="https://pubmed.ncbi.nlm.nih.gov/${id}/" target="_blank" rel="noopener">PMID ${id}</a>`).join('')}</div>
+        ${pmids.length > 40 ? `<div class="tiny faint" style="margin-top:8px">Showing 40 of ${pmids.length}.</div>` : ''}` : ''}
+    </div>
+    ${rec ? `<div class="glass card pv"><h2 class="sec" style="margin:0 0 6px">Literature record</h2>${renderPV(rec, 3)}</div>`
+      : '<div class="glass card empty">No literature section recorded for this compound.</div>'}`);
+}
+
+/* ---------- patents ---------- */
+async function patentsTab(cid, set, loader) {
+  set(loader);
+  const j = await safe(getJSON(`${PUG}/compound/cid/${cid}/xrefs/PatentID/JSON`), null);
+  const list = (j && j.InformationList && j.InformationList.Information[0] && j.InformationList.Information[0].PatentID) || [];
+  set(`
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Patents citing this compound <span class="faint">(${list.length})</span></h2>
+      ${list.length ? `<div class="tags">${list.slice(0, 80).map(id =>
+        `<a class="tag mono" href="https://patents.google.com/patent/${encodeURIComponent(id)}" target="_blank" rel="noopener">${esc(id)}</a>`).join('')}</div>
+        ${list.length > 80 ? `<div class="tiny faint" style="margin-top:8px">Showing 80 of ${list.length}.</div>` : ''}`
+        : '<div class="muted small">No patent identifiers are linked to this record.</div>'}
+    </div>
+    <div class="glass card"><h2 class="sec" style="margin:0 0 8px">Patent deposits in PubChem</h2>
+      <p class="credit">PubChem also hosts patent-derived substance records. Open the PubChem page and use the
+      “Patents” filter to browse them.</p>
+      <div class="btns"><a class="btn" href="${WEB}/${cid}" target="_blank" rel="noopener">Open PubChem ↗</a></div></div>`);
+}
+
+/* ---------- uses ---------- */
+async function usesTab(cid, set, loader) {
+  set(loader);
+  const [use, drug, agro] = await Promise.all([
+    safe(pvHeading(cid, 'Use and Manufacturing'), null),
+    safe(pvHeading(cid, 'Drug and Medication Information'), null),
+    safe(pvHeading(cid, 'Agrochemical Information'), null)
+  ]);
+  const block = (rec, title) => rec
+    ? `<div class="glass card pv"><h2 class="sec" style="margin:0 0 6px">${esc(title)}</h2>${renderPV(rec, 3)}</div>` : '';
+  const html = block(drug, 'Drug & medication information') + block(use, 'Use and manufacturing') + block(agro, 'Agrochemical information');
+  set(html || `<div class="glass card empty">PubChem records no use, drug or agrochemical information for this compound.</div>`);
+}
+
+/* ---------- similar ---------- */
+async function similarTab(cid, p, set, loader) {
+  const smi = p.IsomericSMILES || p.CanonicalSMILES;
+  if (!smi) { set(`<div class="glass card empty">No SMILES is recorded, so similarity search is unavailable.</div>`); return; }
+  set(loader);
+  const j = await safe(getJSON(`${PUG}/compound/fastsimilarity_2d/smiles/${encodeURIComponent(smi)}/cids/JSON?Threshold=90`), null);
+  const ids = ((j && j.IdentifierList && j.IdentifierList.CID) || []).filter(x => String(x) !== String(cid)).slice(0, 24);
+  if (!ids.length) { set(`<div class="glass card empty">No structures ≥ 90% similar were found.</div>`); return; }
+  const props = await safe(batchProps(ids), []);
+  set(`<div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">≥ 90% similar structures</h2>
+      <div class="muted small">Fingerprint similarity search (fastsimilarity_2d) on the PubChem canonical SMILES.</div>
+    </div>
+    ${props.map(resultRow).join('')}`);
+  $$('[data-cid]').forEach(el => el.addEventListener('click', () => go(`#/c/${el.dataset.cid}/overview`)));
+}
+
+/* ---------- download ---------- */
+function downloadTab(cid, p, set) {
+  const items = [
+    ['2D structure (PNG)', `${PUG}/compound/cid/${cid}/PNG?image_size=large`],
+    ['3D conformer (PNG)', `${PUG}/compound/cid/${cid}/PNG?record_type=3d&image_size=large`],
+    ['2D SDF', `${PUG}/compound/cid/${cid}/SDF`],
+    ['3D SDF', `${PUG}/compound/cid/${cid}/SDF?record_type=3d`],
+    ['Properties (JSON)', `${PUG}/compound/cid/${cid}/property/${PROP_FIELDS.slice(0, 12).join(',')}/JSON`],
+    ['Full PUG View record (JSON)', `${PVW}/${cid}/JSON`],
+    ['Record (XML)', `${PUG}/compound/cid/${cid}/XML`],
+    ['Synonyms (JSON)', `${PUG}/compound/cid/${cid}/synonyms/JSON`],
+    ['PubChem record page', `${WEB}/${cid}`]
+  ];
+  set(`
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 10px">Downloads from PubChem</h2>
+      <dl class="props">${items.map(([n, u]) =>
+        `<div><dt>${esc(n)}</dt><dd><a href="${esc(u)}" target="_blank" rel="noopener">open ↗</a></dd></div>`).join('')}</dl>
+      <p class="credit" style="margin-top:12px">Files are served directly by pubchem.ncbi.nlm.nih.gov. Credit PubChem when redistributing.</p>
+    </div>
+    <div class="glass card">
+      <h2 class="sec" style="margin:0 0 8px">Cite this record</h2>
+      <p class="mono small">PubChem CID ${esc(cid)}${p.Title ? ' — ' + esc(p.Title) : ''}. National Center for Biotechnology Information, PubChem Compound Database.
+      Accessed ${new Date().toISOString().slice(0, 10)}. https://pubchem.ncbi.nlm.nih.gov/compound/${esc(cid)}</p>
+      <div class="btns"><button class="btn primary" id="citeBtn">Copy citation</button></div>
+    </div>`);
+  const b = $('#citeBtn');
+  if (b) b.addEventListener('click', () => copy(
+    `PubChem CID ${cid}${p.Title ? ' — ' + p.Title : ''}. National Center for Biotechnology Information, PubChem Compound Database. Accessed ${new Date().toISOString().slice(0, 10)}. https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`));
+}
+
+/* =========================================================================
+   boot
+   ========================================================================= */
+$('#themeBtn').addEventListener('click', () => {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+$$('#tabs button').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.nav;
+  go(v === 'home' ? '#/' : '#/' + v);
+}));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+if (!location.hash) location.replace('#/');
+render();
+</script>
+</body>
+</html>

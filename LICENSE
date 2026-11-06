@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 technicalnihilist-lgtm
+Copyright (c) 2026 ChemSearch contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Chemical data shown by this application is provided by PubChem, an open
+chemistry database at the National Center for Biotechnology Information
+(NCBI), U.S. National Library of Medicine, National Institutes of Health.
+PubChem data is in the public domain and remains subject to PubChem's own
+terms of use: https://pubchem.ncbi.nlm.nih.gov/docs/programmatic-access
+
+ChemSearch is an independent client. It is not endorsed by, affiliated with,
+or supported by NCBI or NIH.

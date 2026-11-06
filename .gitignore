@@ -1,0 +1,6 @@
+android/build/
+android/assets/
+android/chemsearch.jks
+android/*.apk
+*.log
+.DS_Store
