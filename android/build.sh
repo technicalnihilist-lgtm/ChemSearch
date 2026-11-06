@@ -19,8 +19,8 @@ PLAT="${ANDROID_JAR:-$SDK/platforms/android-34/android.jar}"
 [ -f "$PLAT" ]     || { echo "android.jar not found at $PLAT"; exit 1; }
 command -v javac >/dev/null || { echo "javac not on PATH"; exit 1; }
 
-VERSION_NAME="1.0.0"
-VERSION_CODE="1"
+VERSION_NAME="1.1.0"
+VERSION_CODE="2"
 
 cd "$AND"
 rm -rf build

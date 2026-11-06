@@ -263,6 +263,28 @@ hr.hair{border:0; border-top:1px solid var(--hair); margin:14px 0}
 a{color:var(--tint)}
 .hidden{display:none!important}
 @media (min-width:640px){ main#view{padding-left:max(14px, calc(50vw - 300px)); padding-right:max(14px, calc(50vw - 300px))} }
+
+/* ===== home hub ===== */
+.tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.tile{position:relative; padding:13px; border-radius:20px; border:1px solid var(--hair);
+  background:rgba(255,255,255,.07); cursor:pointer; text-align:left; font-family:inherit; color:var(--text);
+  transition:transform .16s var(--ease); box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+html[data-theme="light"] .tile{background:rgba(255,255,255,.62)}
+.tile:active{transform:scale(.97)}
+.tile .ic{width:28px;height:28px;border-radius:10px;display:grid;place-items:center;font-size:13px;
+  background:rgba(255,255,255,.12); border:1px solid var(--hair); margin-bottom:9px}
+.tile .tt{font-weight:650; font-size:13.5px; letter-spacing:-.2px}
+.tile .td{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.35}
+.srow{display:flex; gap:11px; align-items:center; width:100%; padding:10px 0; border:0;
+  border-bottom:1px solid var(--hair); background:none; color:var(--text); font-family:inherit;
+  text-align:left; cursor:pointer}
+.srow:last-child{border-bottom:0}
+.srow .g{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:12px;
+  background:rgba(255,255,255,.11); border:1px solid var(--hair); flex:0 0 auto}
+.srow .t{font-weight:640; font-size:13.5px; display:block}
+.srow .d{font-size:11.5px; color:var(--muted); line-height:1.35; margin-top:1px}
+.srow .arrow{color:var(--faint); font-size:15px}
+.srow:active .t{color:var(--tint)}
 </style>
 </head>
 <body>
@@ -462,9 +484,55 @@ const POPULAR = [
   ['Serotonin', 5202], ['Capsaicin', 1548943]
 ];
 
+const SECTIONS = [
+  ['overview', 'Overview', '2D structure, formula, mass, LogP, H-bond counts, identifiers, synonyms', '◈'],
+  ['props', 'Properties', 'Every computed descriptor PubChem publishes, plus all depositor synonyms', '≡'],
+  ['struct', 'Structure', 'Large 2D depiction, 3D conformer, stereochemistry, SDF export', '◇'],
+  ['phys', 'Physical', 'Appearance, melting and boiling point, density, solubility, pKa', '⚖'],
+  ['safety', 'Safety', 'GHS pictograms, signal word, H-statements, toxicology, ecology', '⚠'],
+  ['bio', 'Bioactivity', 'Every PubChem BioAssay the compound appears in, plus assay summaries', '⌁'],
+  ['lit', 'Literature', 'PubMed citations and the full depositor literature record', '❝'],
+  ['patents', 'Patents', 'Patent identifiers cross-linked to Google Patents', '⎙'],
+  ['classes', 'Classes', 'MeSH tree, ChEBI, KEGG, ATC and other PubChem ontologies', '⌗'],
+  ['spectra', 'Spectra', 'NMR, mass spec, IR, Raman and UV-Vis records', '∿'],
+  ['uses', 'Uses', 'Use & manufacturing, drug and medication, agrochemical information', '⚙'],
+  ['vendors', 'Vendors', 'Chemical vendors and supplier records', '▤'],
+  ['similar', 'Similar', 'Fingerprint similarity search at 90% or better', '≈'],
+  ['download', 'Download', 'PNG, SDF, JSON, XML and a ready-made citation', '↓']
+];
+
+function randomCompound() {
+  const pool = POPULAR.filter(p => !HIST[0] || String(p[1]) !== String(HIST[0].cid));
+  const pick = pool[Math.floor(Math.random() * pool.length)] || POPULAR[0];
+  go('#/c/' + pick[1] + '/overview');
+}
+
+function openSearchSheet() {
+  const modes = [
+    ['Compound name', 'aspirin · caffeine · penicillin g', 'aspirin'],
+    ['PubChem CID', '2244 · 962 · 2519', '2244'],
+    ['SMILES', 'CC(=O)Oc1ccccc1C(=O)O', 'CC(=O)Oc1ccccc1C(=O)O'],
+    ['InChIKey', 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N', 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N'],
+    ['Molecular formula', 'C9H8O4 · C8H10N4O2', 'C9H8O4']
+  ];
+  sheet(`<div style="font-weight:700;font-size:17px;margin-bottom:4px">Five ways to search</div>
+    <p class="small muted" style="margin:0 0 12px">ChemSearch asks PubChem in this order and opens the first
+    record that matches. Everything runs through the public PUG REST API.</p>
+    <dl class="props">${modes.map(([n, ex, q]) => `<div><dt>${esc(n)}</dt><dd>
+      <span class="mono">${esc(ex)}</span>
+      <div class="btns" style="margin-top:7px"><button class="btn" data-try="${esc(q)}">Try it</button></div>
+    </dd></div>`).join('')}</dl>
+    <div class="btns"><button class="btn" data-close="1">Close</button></div>`);
+  $$('[data-try]').forEach(b => b.addEventListener('click', () => { closeSheet(); submit(b.dataset.try); }));
+}
+
 function renderHome() {
-  const favs = FAVS.slice(0, 4);
-  const hist = HIST.slice(0, 6);
+  const favs = FAVS.slice(0, 3);
+  const hist = HIST.slice(0, 4);
+  const last = HIST[0];
+  const exCid = last ? last.cid : '2244';
+  const exName = last ? (last.title || 'CID ' + last.cid) : 'Aspirin';
+
   view().innerHTML = `
     <div class="hero">
       <h1>Every molecule,<br><em>one search away.</em></h1>
@@ -484,12 +552,39 @@ function renderHome() {
       ${POPULAR.map(([n, c]) => `<button class="chip" data-pop="${c}">${esc(n)}</button>`).join('')}
     </div>
 
-    <h2 class="sec">Jump back in</h2>
-    ${hist.length ? hist.map(h => `<div class="glass result" data-cid="${h.cid}">
+    <h2 class="sec">Everything, from this screen</h2>
+    <div class="tiles">
+      <button class="tile" data-act="sections"><div class="ic">▦</div>
+        <div class="tt">14 data sections</div><div class="td">Every PubChem record type</div></button>
+      <button class="tile" data-act="modes"><div class="ic">⌕</div>
+        <div class="tt">5 search modes</div><div class="td">Name, CID, SMILES, key, formula</div></button>
+      <button class="tile" data-act="elements"><div class="ic">⌗</div>
+        <div class="tt">Periodic table</div><div class="td">118 elements, PubChem data</div></button>
+      <button class="tile" data-act="random"><div class="ic">⤨</div>
+        <div class="tt">Surprise me</div><div class="td">Open a random compound</div></button>
+      <button class="tile" data-act="saved"><div class="ic">★</div>
+        <div class="tt">Saved &amp; history</div><div class="td">${FAVS.length} saved · ${HIST.length} recent</div></button>
+      <button class="tile" data-act="about"><div class="ic">ⓘ</div>
+        <div class="tt">PubChem credit</div><div class="td">Source, citation, endpoints</div></button>
+    </div>
+
+    <h2 class="sec">Open any section in ${esc(exName)}</h2>
+    <div class="glass card" style="padding:4px 14px">
+      ${SECTIONS.map(([k, t, d, g]) => `<button class="srow" data-sec="${k}">
+        <span class="g">${g}</span>
+        <span class="grow"><span class="t">${esc(t)}</span><span class="d">${esc(d)}</span></span>
+        <span class="arrow">›</span></button>`).join('')}
+    </div>
+    <div class="tiny faint" style="margin:6px 4px 0">
+      ${last ? 'Sections open inside your last compound. Search a new one and this list follows you.'
+             : 'No compound opened yet, so these open Aspirin (CID 2244) as an example.'}
+    </div>
+
+    ${hist.length ? `<h2 class="sec">Jump back in</h2>
+      ${hist.map(h => `<div class="glass result" data-cid="${h.cid}">
         <img src="${PUG}/compound/cid/${h.cid}/PNG?image_size=small" alt="" loading="lazy">
         <div class="grow"><div class="nm truncate">${esc(h.title || 'CID ' + h.cid)}</div>
-        <div class="mt mono">CID ${h.cid} · ${esc(h.formula || '')}</div></div><div class="faint">›</div></div>`).join('')
-      : `<div class="glass card"><div class="muted small">Nothing yet — search a compound to begin.</div></div>`}
+        <div class="mt mono">CID ${h.cid} · ${esc(h.formula || '')}</div></div><div class="faint">›</div></div>`).join('')}` : ''}
 
     ${favs.length ? `<h2 class="sec">Saved</h2>
       ${favs.map(f => `<div class="glass result" data-cid="${f.cid}">
@@ -500,8 +595,8 @@ function renderHome() {
     <h2 class="sec">Coverage</h2>
     <div class="grid2">
       <div class="stat"><div class="n">118</div><div class="l">Elements</div></div>
-      <div class="stat"><div class="n">12</div><div class="l">Data sections</div></div>
-      <div class="stat"><div class="n">6</div><div class="l">Search modes</div></div>
+      <div class="stat"><div class="n">14</div><div class="l">Data sections</div></div>
+      <div class="stat"><div class="n">5</div><div class="l">Search modes</div></div>
       <div class="stat"><div class="n">∞</div><div class="l">Compounds</div></div>
     </div>
 
@@ -513,6 +608,7 @@ function renderHome() {
         an open chemistry database at the U.S. National Library of Medicine (NCBI/NIH).
         Please credit PubChem in any reuse of this data.
       </p>
+      <div class="btns"><button class="btn" data-act="about">Citation &amp; details</button></div>
     </div>`;
 
   const q = $('#q');
@@ -527,6 +623,18 @@ function renderHome() {
   $('#goBtn').addEventListener('click', () => submit(q.value.trim()));
   $$('[data-pop]').forEach(b => b.addEventListener('click', () => go(`#/c/${b.dataset.pop}/overview`)));
   $$('[data-cid]').forEach(el => el.addEventListener('click', () => go(`#/c/${el.dataset.cid}/overview`)));
+  $$('[data-sec]').forEach(b => b.addEventListener('click', () => go(`#/c/${exCid}/${b.dataset.sec}`)));
+  $$('[data-act]').forEach(b => b.addEventListener('click', () => {
+    const a = b.dataset.act;
+    if (a === 'sections') {
+      const el = $('[data-sec]');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (a === 'modes') openSearchSheet();
+    else if (a === 'elements') go('#/elements');
+    else if (a === 'random') randomCompound();
+    else if (a === 'saved') go('#/saved');
+    else if (a === 'about') go('#/about');
+  }));
 }
 
 function submit(q) {
@@ -694,7 +802,7 @@ function renderAbout() {
       <p>PubChem data is in the public domain. ChemSearch is an independent client and is not endorsed by or affiliated with NCBI or NIH.</p>
       <hr class="hair">
       <h3>What you can look up</h3>
-      <p>Search by name, CID, SMILES, InChIKey or molecular formula. Each record exposes 12 sections: overview,
+      <p>Search by name, CID, SMILES, InChIKey or molecular formula. Each record exposes 14 tabs: overview,
       computed properties, structure (2D + 3D), chemical &amp; physical properties, safety &amp; hazards (GHS),
       bioactivity and bioassays, literature, patents, classification (MeSH, ChEBI, KEGG, ATC), spectra,
       uses &amp; manufacturing, and vendors — plus similar-structure search and raw downloads.</p>

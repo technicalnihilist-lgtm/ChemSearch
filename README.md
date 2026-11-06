@@ -7,12 +7,13 @@ descriptors, physical properties, GHS safety data, bioassays, literature, patent
 spectra, uses, vendors and similar structures — all live from the PubChem PUG REST and PUG View APIs.
 
 <p>
-  <img src="screenshots/home.png" width="24%" alt="Search screen">
+  <img src="screenshots/home.png" width="24%" alt="Home hub">
+  <img src="screenshots/home2.png" width="24%" alt="Every data section, one tap from home">
   <img src="screenshots/overview.png" width="24%" alt="Compound overview">
   <img src="screenshots/props.png" width="24%" alt="Computed properties">
-  <img src="screenshots/safety.png" width="24%" alt="GHS safety data">
 </p>
 <p>
+  <img src="screenshots/safety.png" width="24%" alt="GHS safety data">
   <img src="screenshots/elements.png" width="24%" alt="Periodic table">
   <img src="screenshots/about.png" width="24%" alt="About and credit">
 </p>
@@ -26,6 +27,12 @@ Download the signed APK from the [latest release](../../releases/latest) and ope
 PubChem at the moment you open it.
 
 ## What's inside
+
+The **home screen is the hub**. Search sits at the top, and directly below it are six tiles
+(data sections, search modes, periodic table, random compound, saved & history, PubChem credit)
+followed by a full list of all 14 data sections with a one-line description of each. Tap any
+section and it opens inside your last-viewed compound — so you can reach every corner of the app
+without hunting through menus.
 
 | Section | What you get |
 | --- | --- |
